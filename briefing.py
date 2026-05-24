@@ -110,18 +110,19 @@ def get_todays_mission():
     day_of_year = now.timetuple().tm_yday
     return MISSIONS[day_of_year % len(MISSIONS)]
 
+CHAT_IDS = ["8980336176", "8827812313"]
+
 def send_telegram(message):
-    if not TELEGRAM_TOKEN or not CHAT_ID:
+    if not TELEGRAM_TOKEN:
         print(message)
         return 0
-    url     = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {"chat_id": CHAT_ID, "text": message}
-    try:
-        r = requests.post(url, json=payload, timeout=15)
-        return r.status_code
-    except Exception as e:
-        print(f"텔레그램 발송 실패: {e}")
-        return -1
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    for chat_id in CHAT_IDS:
+        try:
+            requests.post(url, json={"chat_id": chat_id, "text": message}, timeout=15)
+        except Exception as e:
+            print(f"발송 실패 ({chat_id}): {e}")
+    return 200
 
 def main():
     today   = get_today_str()
