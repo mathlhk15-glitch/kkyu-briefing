@@ -9,16 +9,12 @@ TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 SHEETS_ID      = os.environ.get("SHEETS_ID", "1gCqG1t0HIwTYvt-CQFZz-5K96hW5krhDWrUWq-KBlUI")
 CALENDAR_ICS   = os.environ.get("CALENDAR_ICS", "https://calendar.google.com/calendar/ical/lhk15%40cwgyeongilg-h.gne.go.kr/private-5a0f7c194581f0930c87b167e8716cb4/basic.ics")
 
-CHAT_IDS = ["8980336176", "8827812313"]
+CHAT_IDS       = ["8980336176", "8827812313"]
+DISCHARGE_DATE = date(2027, 7, 26)
+CHANGWON_LAT   = 35.2279
+CHANGWON_LON   = 128.6811
 
 KST = pytz.timezone("Asia/Seoul")
-
-# 이재현 전역 예정일
-DISCHARGE_DATE = date(2027, 7, 26)
-
-# 창원 위도/경도
-CHANGWON_LAT = 35.2279
-CHANGWON_LON = 128.6811
 
 def get_today_str():
     now  = datetime.now(KST)
@@ -40,7 +36,6 @@ def get_weather():
         temp    = current["temperature_2m"]
         precip  = current["precipitation_probability"]
         code    = current["weathercode"]
-
         weather_map = {
             0: "맑음", 1: "대체로 맑음", 2: "구름 조금", 3: "흐림",
             45: "안개", 48: "안개",
@@ -51,13 +46,13 @@ def get_weather():
             95: "뇌우", 96: "뇌우", 99: "뇌우"
         }
         weather_desc = weather_map.get(code, "알 수 없음")
-        return f"{weather_desc} {temp}°C / 강수확률 {precip}%"
+        return f"{weather_desc} {temp}C / 강수확률 {precip}%"
     except Exception:
         return "날씨 조회 실패"
 
 def get_discharge_dday():
-    today    = datetime.now(KST).date()
-    dday     = (DISCHARGE_DATE - today).days
+    today = datetime.now(KST).date()
+    dday  = (DISCHARGE_DATE - today).days
     if dday < 0:
         return "이재현 전역 완료"
     elif dday == 0:
@@ -66,12 +61,74 @@ def get_discharge_dday():
         return f"이재현 전역 D-{dday} 거의 다 왔다!"
     elif dday <= 30:
         return f"이재현 전역 D-{dday} 한 달 남음"
-    elif dday <= 50:
-        return f"이재현 전역 D-{dday}"
-    elif dday <= 100:
-        return f"이재현 전역 D-{dday}"
     else:
         return f"이재현 전역 D-{dday}"
+
+def get_nc_game():
+    try:
+        now      = datetime.now(KST)
+        today_str = now.strftime("%Y%m%d")
+        url = f"https://sports.daum.net/prx/sports/api/schedule/kbo?date={today_str}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        data  = resp.json()
+        games = data.get("schedule", {}).get("gameList", [])
+
+        nc_game = None
+        for game in games:
+            home = game.get("homeTeamName", "")
+            away = game.get("awayTeamName", "")
+            if "NC" in home or "NC" in away:
+                nc_game = game
+                break
+
+        if not nc_game:
+            return "오늘 경기 없음"
+
+        home     = nc_game.get("homeTeamName", "")
+        away     = nc_game.get("awayTeamName", "")
+        time_str = nc_game.get("gameTime", "")
+        status   = nc_game.get("statusInfo", "")
+
+        if time_str and len(time_str) >= 4:
+            hour   = time_str[:2]
+            minute = time_str[2:]
+            time_display = f"{hour}:{minute}"
+        else:
+            time_display = time_str
+
+        if "NC" in home:
+            return f"홈 vs {away} {time_display} ({status})"
+        else:
+            return f"원정 vs {home} {time_display} ({status})"
+
+    except Exception:
+        return get_nc_game_fallback()
+
+def get_nc_game_fallback():
+    try:
+        now       = datetime.now(KST)
+        today_str = now.strftime("%Y%m%d")
+        url = f"https://www.koreabaseball.com/ws/Main.asmx/GetKboSchedule?date={today_str}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        data  = resp.json()
+        games = data.get("games", [])
+
+        for game in games:
+            if "NC" in str(game):
+                home = game.get("home", "")
+                away = game.get("away", "")
+                time = game.get("time", "")
+                if "NC" in home:
+                    return f"홈 vs {away} {time}"
+                else:
+                    return f"원정 vs {home} {time}"
+        return "오늘 경기 없음"
+    except Exception:
+        return "NC 경기 정보 조회 실패"
 
 def get_todays_events():
     if not CALENDAR_ICS:
@@ -210,6 +267,7 @@ def main():
     today           = get_today_str()
     weather         = get_weather()
     discharge       = get_discharge_dday()
+    nc_game         = get_nc_game()
     calendar_events = get_todays_events()
     TICKERS         = get_tickers_from_sheets()
     mission         = get_mission_from_sheets()
@@ -232,10 +290,9 @@ def main():
     msg_lines.append("🛰 뀨의 AI 임무 통제실")
     msg_lines.append(today)
     msg_lines.append("")
-    msg_lines.append("🌤 창원 날씨")
-    msg_lines.append(weather)
-    msg_lines.append("")
+    msg_lines.append("🌤 창원 날씨: " + weather)
     msg_lines.append("🪖 " + discharge)
+    msg_lines.append("⚾ NC다이노스: " + nc_game)
     msg_lines.append("")
     msg_lines.append("📅 오늘의 일정")
     msg_lines.append(calendar_events)
