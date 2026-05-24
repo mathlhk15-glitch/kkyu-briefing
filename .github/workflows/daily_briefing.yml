@@ -1,4 +1,4 @@
-name: 뀨 모닝 브리핑
+name: briefing
 
 on:
   schedule:
@@ -9,18 +9,18 @@ jobs:
   send-briefing:
     runs-on: ubuntu-latest
     steps:
-      - name: 코드 체크아웃
+      - name: checkout
         uses: actions/checkout@v4
 
-      - name: Python 설치
+      - name: setup python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: 패키지 설치
+      - name: install packages
         run: pip install -r requirements.txt
 
-      - name: 브리핑 실행
+      - name: run briefing
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
