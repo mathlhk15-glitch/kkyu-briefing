@@ -6,7 +6,7 @@ from datetime import datetime
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_ID        = os.environ.get("TELEGRAM_CHAT_ID")
-SHEETS_ID      = os.environ.get("SHEETS_ID", "")
+SHEETS_ID = os.environ.get("SHEETS_ID", "1gCqG1t0HIwTYvt-CQFZz-5K96hW5krhDWrUWq-KBlUI")
 
 KST = pytz.timezone("Asia/Seoul")
 
