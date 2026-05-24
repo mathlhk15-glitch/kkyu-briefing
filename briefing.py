@@ -2,7 +2,7 @@ import os
 import requests
 import pytz
 import random
-from datetime import datetime
+from datetime import datetime, date
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -13,10 +13,65 @@ CHAT_IDS = ["8980336176", "8827812313"]
 
 KST = pytz.timezone("Asia/Seoul")
 
+# 이재현 전역 예정일
+DISCHARGE_DATE = date(2027, 7, 26)
+
+# 창원 위도/경도
+CHANGWON_LAT = 35.2279
+CHANGWON_LON = 128.6811
+
 def get_today_str():
     now  = datetime.now(KST)
     days = ["월", "화", "수", "목", "금", "토", "일"]
     return f"{now.strftime('%Y.%m.%d')} {days[now.weekday()]}요일"
+
+def get_weather():
+    try:
+        url = (
+            "https://api.open-meteo.com/v1/forecast"
+            f"?latitude={CHANGWON_LAT}&longitude={CHANGWON_LON}"
+            "&current=temperature_2m,precipitation_probability,weathercode"
+            "&timezone=Asia%2FSeoul"
+        )
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        data    = resp.json()
+        current = data["current"]
+        temp    = current["temperature_2m"]
+        precip  = current["precipitation_probability"]
+        code    = current["weathercode"]
+
+        weather_map = {
+            0: "맑음", 1: "대체로 맑음", 2: "구름 조금", 3: "흐림",
+            45: "안개", 48: "안개",
+            51: "이슬비", 53: "이슬비", 55: "이슬비",
+            61: "비", 63: "비", 65: "강한 비",
+            71: "눈", 73: "눈", 75: "강한 눈",
+            80: "소나기", 81: "소나기", 82: "강한 소나기",
+            95: "뇌우", 96: "뇌우", 99: "뇌우"
+        }
+        weather_desc = weather_map.get(code, "알 수 없음")
+        return f"{weather_desc} {temp}°C / 강수확률 {precip}%"
+    except Exception:
+        return "날씨 조회 실패"
+
+def get_discharge_dday():
+    today    = datetime.now(KST).date()
+    dday     = (DISCHARGE_DATE - today).days
+    if dday < 0:
+        return "이재현 전역 완료"
+    elif dday == 0:
+        return "이재현 오늘 전역!"
+    elif dday <= 7:
+        return f"이재현 전역 D-{dday} 거의 다 왔다!"
+    elif dday <= 30:
+        return f"이재현 전역 D-{dday} 한 달 남음"
+    elif dday <= 50:
+        return f"이재현 전역 D-{dday}"
+    elif dday <= 100:
+        return f"이재현 전역 D-{dday}"
+    else:
+        return f"이재현 전역 D-{dday}"
 
 def get_todays_events():
     if not CALENDAR_ICS:
@@ -153,6 +208,8 @@ def send_telegram(message):
 
 def main():
     today           = get_today_str()
+    weather         = get_weather()
+    discharge       = get_discharge_dday()
     calendar_events = get_todays_events()
     TICKERS         = get_tickers_from_sheets()
     mission         = get_mission_from_sheets()
@@ -174,6 +231,11 @@ def main():
     msg_lines = []
     msg_lines.append("🛰 뀨의 AI 임무 통제실")
     msg_lines.append(today)
+    msg_lines.append("")
+    msg_lines.append("🌤 창원 날씨")
+    msg_lines.append(weather)
+    msg_lines.append("")
+    msg_lines.append("🪖 " + discharge)
     msg_lines.append("")
     msg_lines.append("📅 오늘의 일정")
     msg_lines.append(calendar_events)
