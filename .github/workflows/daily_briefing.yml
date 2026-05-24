@@ -3,6 +3,7 @@ name: briefing
 on:
   schedule:
     - cron: '0 21 * * *'
+    - cron: '0 23 * * 6'
   workflow_dispatch:
 
 jobs:
@@ -25,4 +26,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SHEETS_ID: ${{ secrets.SHEETS_ID }}
+          CALENDAR_ICS: ${{ secrets.CALENDAR_ICS }}
+          RUN_TYPE: ${{ github.event_name == 'schedule' && contains(github.event.schedule, '23') && 'weekly' || 'daily' }}
         run: python briefing.py
