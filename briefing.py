@@ -7,7 +7,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_ID        = os.environ.get("TELEGRAM_CHAT_ID")
 SHEETS_ID      = os.environ.get("SHEETS_ID", "1gCqG1t0HIwTYvt-CQFZz-5K96hW5krhDWrUWq-KBlUI")
-CALENDAR_ICS   = os.environ.get("CALENDAR_ICS", "")
+CALENDAR_ICS   = os.environ.get("CALENDAR_ICS", "https://calendar.google.com/calendar/ical/lhk15%40cwgyeongilg-h.gne.go.kr/private-5a0f7c194581f0930c87b167e8716cb4/basic.ics")
 
 CHAT_IDS = ["8980336176", "8827812313"]
 
