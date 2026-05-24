@@ -8,11 +8,43 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_ID        = os.environ.get("TELEGRAM_CHAT_ID")
 
-# ── 관심 종목 설정 (나중에 Google Sheets로 이전 예정) ──
-TICKERS = {
-    "이현규": ["VRT", "OII", "BWXT", "TEM", "ALAB"],
-    "임인숙": ["MSFT", "GOOGL", "NVDA", "UNH", "QQQ"],
-}
+# ── Google Sheets에서 종목 읽기 ────────────────────────
+SHEETS_ID = os.environ.get("SHEETS_ID", "")
+
+def get_tickers_from_sheets():
+    """Sheets에서 종목 데이터를 읽어온다. 실패 시 기본값 반환."""
+    if not SHEETS_ID:
+        return {
+            "이현규": ["VRT", "OII", "BWXT", "TEM", "ALAB"],
+            "임인숙": ["MSFT", "GOOGL", "NVDA", "UNH", "QQQ"],
+        }
+    try:
+        url = (
+            f"https://docs.google.com/spreadsheets/d/{SHEETS_ID}"
+            "/gviz/tq?tqx=out:csv&sheet=tickers"
+        )
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        lines = resp.text.strip().split("\n")
+        tickers = {}
+        for line in lines[1:]:  # 헤더 제외
+            parts = line.replace('"', '').split(",")
+            if len(parts) >= 2:
+                owner  = parts[0].strip()
+                ticker = parts[1].strip()
+                if owner not in tickers:
+                    tickers[owner] = []
+                if ticker not in tickers[owner]:
+                    tickers[owner].append(ticker)
+        return tickers if tickers else {
+            "이현규": ["VRT", "OII", "BWXT", "TEM", "ALAB"],
+            "임인숙": ["MSFT", "GOOGL", "NVDA", "UNH", "QQQ"],
+        }
+    except Exception:
+        return {
+            "이현규": ["VRT", "OII", "BWXT", "TEM", "ALAB"],
+            "임인숙": ["MSFT", "GOOGL", "NVDA", "UNH", "QQQ"],
+        }
 
 KST = pytz.timezone("Asia/Seoul")
 
@@ -119,9 +151,17 @@ def main():
     today = get_today_str()
 
     # 주식 데이터 수집
-    lines_현규 = get_stock_data(TICKERS["이현규"])
-    lines_인숙 = get_stock_data(TICKERS["임인숙"])
-
+TICKERS = get_tickers_from_sheets()
+    
+    # 계좌별 주식 데이터 수집
+    account_blocks = []
+    for owner, tickers in TICKERS.items():
+        lines = get_stock_data(tickers)
+        account_blocks.append(f"💹 {owner} 계좌\n" + "\n".join(lines))
+    
+    stock_summary = "\n".join(
+        line for block in account_blocks for line in block.split("\n")
+    )
     stock_summary = "\n".join(lines_현규 + lines_인숙)
 
     # AI 코멘트 생성 (실패해도 fallback으로 대체)
@@ -131,14 +171,10 @@ def main():
     cat, mission_title, success_cond = get_todays_mission()
 
     # 최종 메시지 조립
-    message = f"""🛰 뀨의 AI 임무 통제실
+message = f"""🛰 뀨의 AI 임무 통제실
 {today}
 
-💹 이현규 계좌
-{chr(10).join(lines_현규)}
-
-💹 임인숙 계좌
-{chr(10).join(lines_인숙)}
+{chr(10).join(account_blocks)}
 
 🤖 AI 코멘트
 {ai_comment}
