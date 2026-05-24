@@ -66,67 +66,48 @@ def get_discharge_dday():
 
 def get_nc_game():
     try:
-        now      = datetime.now(KST)
-        today_str = now.strftime("%Y%m%d")
-        url = f"https://sports.daum.net/prx/sports/api/schedule/kbo?date={today_str}"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        resp = requests.get(url, headers=headers, timeout=10)
-        resp.raise_for_status()
-        data  = resp.json()
-        games = data.get("schedule", {}).get("gameList", [])
-
-        nc_game = None
-        for game in games:
-            home = game.get("homeTeamName", "")
-            away = game.get("awayTeamName", "")
-            if "NC" in home or "NC" in away:
-                nc_game = game
-                break
-
-        if not nc_game:
-            return "오늘 경기 없음"
-
-        home     = nc_game.get("homeTeamName", "")
-        away     = nc_game.get("awayTeamName", "")
-        time_str = nc_game.get("gameTime", "")
-        status   = nc_game.get("statusInfo", "")
-
-        if time_str and len(time_str) >= 4:
-            hour   = time_str[:2]
-            minute = time_str[2:]
-            time_display = f"{hour}:{minute}"
-        else:
-            time_display = time_str
-
-        if "NC" in home:
-            return f"홈 vs {away} {time_display} ({status})"
-        else:
-            return f"원정 vs {home} {time_display} ({status})"
-
-    except Exception:
-        return get_nc_game_fallback()
-
-def get_nc_game_fallback():
-    try:
         now       = datetime.now(KST)
         today_str = now.strftime("%Y%m%d")
-        url = f"https://www.koreabaseball.com/ws/Main.asmx/GetKboSchedule?date={today_str}"
-        headers = {"User-Agent": "Mozilla/5.0"}
+        url = f"https://sports.news.naver.com/kbaseball/schedule/index?date={today_str}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        }
         resp = requests.get(url, headers=headers, timeout=10)
         resp.raise_for_status()
-        data  = resp.json()
-        games = data.get("games", [])
+        html = resp.text
 
-        for game in games:
-            if "NC" in str(game):
-                home = game.get("home", "")
-                away = game.get("away", "")
-                time = game.get("time", "")
-                if "NC" in home:
-                    return f"홈 vs {away} {time}"
-                else:
-                    return f"원정 vs {home} {time}"
-        return "오늘 경기 없음"
+        if "NC" not in html:
+            return "오늘 경기 없음"
+
+        from html.parser import HTMLParser
+        import re
+
+        pattern = r'NC[^<]*?(?:vs|VS)[^<]*?(\w+)|(\w+)[^<]*?(?:vs|VS)[^<]*?NC'
+        matches = re.findall(pattern, html)
+
+        nc_index = html.find("NC")
+        if nc_index == -1:
+            return "오늘 경기 없음"
+
+        chunk = html[max(0, nc_index-200):nc_index+200]
+        chunk = re.sub(r'<[^>]+>', ' ', chunk)
+        chunk = re.sub(r'\s+', ' ', chunk).strip()
+
+        time_match = re.search(r'(\d{1,2}:\d{2})', chunk)
+        time_str   = time_match.group(1) if time_match else ""
+
+        team_pattern = re.findall(r'(NC|롯데|삼성|두산|LG|KT|SSG|한화|키움|KIA)', chunk)
+        if len(team_pattern) >= 2:
+            teams = list(dict.fromkeys(team_pattern))
+            if "NC" in teams:
+                teams.remove("NC")
+                opponent = teams[0] if teams else "상대팀"
+            else:
+                opponent = "상대팀"
+            return f"vs {opponent} {time_str}".strip()
+
+        return "경기 일정 확인 필요"
+
     except Exception:
         return "NC 경기 정보 조회 실패"
 
