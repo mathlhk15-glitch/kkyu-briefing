@@ -24,8 +24,8 @@ def get_tickers_from_sheets():
         return default
     try:
         url = (
-            f"https://docs.google.com/spreadsheets/d/1gCqG1t0HIwTYvt-CQFZz-5K96hW5krhDWrUWq-KBlUI"
-            "/gviz/tq?tqx=out:csv&sheet=tickers"
+            "https://docs.google.com/spreadsheets/d/" + SHEETS_ID
+            + "/gviz/tq?tqx=out:csv&sheet=tickers"
         )
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
