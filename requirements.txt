@@ -3,4 +3,3 @@ yfinance
 requests
 pytz
 icalendar
-feedparser
