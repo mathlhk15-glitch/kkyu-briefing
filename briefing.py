@@ -11,7 +11,7 @@ CALENDAR_ICS   = os.environ.get("CALENDAR_ICS", "https://calendar.google.com/cal
 RUN_TYPE       = os.environ.get("RUN_TYPE", "daily")
 
 CHAT_IDS       = ["8980336176", "8827812313"]
-DISCHARGE_DATE = date(2027, 7, 26)
+DISCHARGE_DATE = date(2027, 7, 25)
 CHANGWON_LAT   = 35.2279
 CHANGWON_LON   = 128.6811
 
