@@ -3,6 +3,8 @@ import requests
 import pytz
 import random
 from datetime import datetime, date
+from urllib.parse import quote
+import xml.etree.ElementTree as ET
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -90,6 +92,76 @@ def get_todays_events():
         return "오늘 일정 없음"
     except Exception:
         return "캘린더 읽기 실패"
+
+def _clean_news_title(title):
+    title = (title or "").replace("&quot;", '"').replace("&amp;", "&").strip()
+    for sep in [" - ", " | "]:
+        if sep in title:
+            title = title.split(sep)[0].strip()
+    return title
+
+def fetch_google_news(keyword, limit=3):
+    try:
+        encoded_keyword = quote(keyword)
+        url = (
+            "https://news.google.com/rss/search?q=" + encoded_keyword
+            + "&hl=ko&gl=KR&ceid=KR:ko"
+        )
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        root = ET.fromstring(resp.content)
+        items = []
+        for item in root.findall(".//item"):
+            title_node = item.find("title")
+            link_node = item.find("link")
+            title = _clean_news_title(title_node.text if title_node is not None else "")
+            link = (link_node.text if link_node is not None else "").strip()
+            if title and title not in [x["title"] for x in items]:
+                items.append({"title": title, "link": link})
+            if len(items) >= limit:
+                break
+        return items
+    except Exception:
+        return []
+
+def build_news_briefing():
+    news_plan = {
+        "경제": ["경제", "금리", "환율", "반도체", "AI 산업"],
+        "주요": ["주요뉴스", "국제", "사회"],
+        "교육·진로": ["교육부", "대입", "고교학점제", "AI 교육"]
+    }
+    section_limits = {
+        "경제": 3,
+        "주요": 3,
+        "교육·진로": 2
+    }
+
+    sections = []
+    for section, keywords in news_plan.items():
+        collected = []
+        for keyword in keywords:
+            items = fetch_google_news(keyword, limit=2)
+            for item in items:
+                if item["title"] not in [x["title"] for x in collected]:
+                    collected.append(item)
+                if len(collected) >= section_limits[section]:
+                    break
+            if len(collected) >= section_limits[section]:
+                break
+
+        if not collected:
+            sections.append("[" + section + "]\n뉴스 조회 실패")
+            continue
+
+        lines = ["[" + section + "]"]
+        for idx, item in enumerate(collected, 1):
+            lines.append(str(idx) + ". " + item["title"])
+            if item["link"]:
+                lines.append(item["link"])
+        sections.append("\n".join(lines))
+
+    return "📰 오늘 아침 간단 뉴스\n" + "\n\n".join(sections)
+
 
 def get_tickers_from_sheets():
     default = {
@@ -281,6 +353,7 @@ def run_daily():
     weather         = get_weather()
     discharge       = get_discharge_dday()
     calendar_events = get_todays_events()
+    news_text       = build_news_briefing()
     TICKERS         = get_tickers_from_sheets()
     mission         = get_mission_from_sheets()
     cat             = mission[0]
@@ -307,6 +380,8 @@ def run_daily():
     msg_lines.append("")
     msg_lines.append("📅 오늘의 일정")
     msg_lines.append(calendar_events)
+    msg_lines.append("")
+    msg_lines.append(news_text)
     msg_lines.append("")
     for block in account_blocks:
         msg_lines.append(block)
